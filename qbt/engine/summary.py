@@ -14,16 +14,15 @@ from .viz import Visualizer
 class SummaryReport:
     """Generate comprehensive PDF reports for backtest results."""
     
-    def __init__(self, result: BacktestResult, config: Dict[str, Any]):
+    def __init__(self, result: BacktestResult):
         """
         Initialize summary report.
         
         Args:
-            result: BacktestResult object
-            config: Configuration dictionary with backtest parameters
+            result: BacktestResult object (config is read from result.config)
         """
         self.result = result
-        self.config = config
+        self.config = result.config
         self.metrics = PerformanceMetrics.calculate_metrics(result)
         
     def generate_pdf(self, filename: str = None) -> str:
@@ -424,46 +423,3 @@ class SummaryReport:
         plt.close(fig)
 
 
-def create_backtest_config(
-    universe: List[str],
-    start_date: datetime,
-    end_date: datetime,
-    initial_cash: float,
-    strategy_config: Dict[str, Any],
-    signals_config: List[str],
-    broker_config: Dict[str, Any],
-    benchmark_config: Optional[Dict[str, Any]] = None,
-    interval: str = "1d"
-) -> Dict[str, Any]:
-    """
-    Create configuration dictionary for backtest report.
-    
-    Args:
-        universe: List of symbols
-        start_date: Backtest start date
-        end_date: Backtest end date
-        initial_cash: Starting capital
-        strategy_config: Strategy configuration
-        signals_config: List of signal generator descriptions
-        broker_config: Broker configuration
-        benchmark_config: Optional benchmark configuration
-        interval: Data interval
-        
-    Returns:
-        Configuration dictionary
-    """
-    config = {
-        'universe': universe,
-        'start_date': start_date,
-        'end_date': end_date,
-        'initial_cash': initial_cash,
-        'interval': interval,
-        'strategy': strategy_config,
-        'signals': signals_config,
-        'broker': broker_config
-    }
-    
-    if benchmark_config:
-        config['benchmark'] = benchmark_config
-    
-    return config

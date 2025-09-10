@@ -23,6 +23,8 @@ class BacktestResult:
         self.benchmark_equity_curve: List[Dict[str, Any]] = []
         self.benchmark_trades: List[Fill] = []
         self.benchmark_final_equity: float = 0.0
+        # Configuration data
+        self.config: Dict[str, Any] = {}
         
     def to_dataframe(self) -> pd.DataFrame:
         """Convert equity curve to DataFrame."""
@@ -105,7 +107,8 @@ class Backtester:
         universe: List[str],
         start_date: datetime,
         end_date: datetime,
-        interval: str = "1d"
+        interval: str = "1d",
+        strategy_name: str = None
     ) -> BacktestResult:
         """
         Run the backtest.
@@ -115,6 +118,7 @@ class Backtester:
             start_date: Start date for backtest
             end_date: End date for backtest
             interval: Data interval
+            strategy_name: Optional name for the strategy (for reporting)
             
         Returns:
             BacktestResult with equity curve, trades, and metrics
@@ -123,6 +127,16 @@ class Backtester:
         result.start_date = start_date
         result.end_date = end_date
         result.initial_cash = self.initial_cash
+        
+        # Populate configuration automatically
+        result.config = self._create_config(
+            universe=universe,
+            start_date=start_date,
+            end_date=end_date,
+            initial_cash=self.initial_cash,
+            interval=interval,
+            strategy_name=strategy_name
+        )
         
         # Initialize portfolio state
         state = PortfolioState(cash=self.initial_cash)
@@ -238,3 +252,85 @@ class Backtester:
             print(f"Alpha vs Benchmark: {alpha:.2f}%")
         
         return result
+    
+    def _create_config(
+        self,
+        universe: List[str],
+        start_date: datetime,
+        end_date: datetime,
+        initial_cash: float,
+        interval: str,
+        strategy_name: str = None
+    ) -> Dict[str, Any]:
+        """
+        Create configuration dictionary automatically.
+        
+        Args:
+            universe: List of symbols
+            start_date: Backtest start date
+            end_date: Backtest end date
+            initial_cash: Starting capital
+            interval: Data interval
+            strategy_name: Optional strategy name
+            
+        Returns:
+            Configuration dictionary
+        """
+        # Extract strategy information
+        strategy_config = {
+            'name': strategy_name or self.strategy.__class__.__name__,
+            'class': self.strategy.__class__.__name__,
+        }
+        
+        # Add strategy-specific configuration if available
+        if hasattr(self.strategy, 'position_size'):
+            strategy_config['position_size'] = self.strategy.position_size
+        if hasattr(self.strategy, 'signal_column'):
+            strategy_config['signal_column'] = self.strategy.signal_column
+        if hasattr(self.strategy, 'allocation_method'):
+            strategy_config['allocation_method'] = self.strategy.allocation_method
+        
+        # Extract signal generator information
+        signals_config = []
+        for signal_gen in self.signal_generators:
+            signal_info = signal_gen.__class__.__name__
+            if hasattr(signal_gen, 'short_period') and hasattr(signal_gen, 'long_period'):
+                signal_info += f" ({signal_gen.short_period}, {signal_gen.long_period} periods)"
+            elif hasattr(signal_gen, 'period'):
+                signal_info += f" ({signal_gen.period} periods)"
+            signals_config.append(signal_info)
+        
+        # Extract broker configuration
+        broker_config = {
+            'class': self.broker.__class__.__name__,
+        }
+        if hasattr(self.broker, 'commission'):
+            broker_config['commission'] = self.broker.commission
+        if hasattr(self.broker, 'slippage'):
+            broker_config['slippage'] = self.broker.slippage
+        
+        # Extract benchmark configuration if available
+        benchmark_config = None
+        if self.benchmark_strategy:
+            benchmark_config = {
+                'name': self.benchmark_strategy.__class__.__name__,
+                'class': self.benchmark_strategy.__class__.__name__,
+            }
+            if hasattr(self.benchmark_strategy, 'allocation_method'):
+                benchmark_config['allocation_method'] = self.benchmark_strategy.allocation_method
+        
+        config = {
+            'universe': universe,
+            'start_date': start_date,
+            'end_date': end_date,
+            'initial_cash': initial_cash,
+            'interval': interval,
+            'strategy': strategy_config,
+            'signals': signals_config,
+            'broker': broker_config
+        }
+        
+        if benchmark_config:
+            config['benchmark'] = benchmark_config
+        
+        return config

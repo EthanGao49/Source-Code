@@ -24,7 +24,7 @@ from qbt.execution.simple_broker import SimpleBroker
 from qbt.engine.backtester import Backtester
 from qbt.engine.metrics import PerformanceMetrics
 from qbt.engine.viz import Visualizer
-from qbt.engine.summary import SummaryReport, create_backtest_config
+from qbt.engine.summary import SummaryReport
 
 
 def main():
@@ -82,7 +82,8 @@ def main():
         result = backtester.run(
             universe=universe,
             start_date=start_date,
-            end_date=end_date
+            end_date=end_date,
+            strategy_name="EMA CrossOver Strategy"
         )
         
         if result.equity_curve:
@@ -127,33 +128,8 @@ def main():
             # Generate PDF report
             print("\nGenerating PDF report...")
             try:
-                # Create configuration for report
-                config = create_backtest_config(
-                    universe=universe,
-                    start_date=start_date,
-                    end_date=end_date,
-                    initial_cash=initial_cash,
-                    strategy_config={
-                        'name': 'CrossOver Strategy',
-                        'position_size': 0.3,
-                        'type': 'EMA Crossover'
-                    },
-                    signals_config=[
-                        'EMA Signal (12, 26 periods)'
-                    ],
-                    broker_config={
-                        'commission': 0,
-                        'slippage': 0,
-                        'type': 'SimpleBroker'
-                    },
-                    benchmark_config={
-                        'name': 'Buy and Hold',
-                        'allocation_method': 'equal_weight'
-                    } if result.benchmark_equity_curve else None
-                )
-                
-                # Generate report
-                report = SummaryReport(result, config)
+                # Generate report (config is automatically included in result)
+                report = SummaryReport(result)
                 pdf_filename = report.generate_pdf()
                 print(f"PDF report saved as: {pdf_filename}")
                 
@@ -210,7 +186,8 @@ def simple_example():
         result = backtester.run(
             universe=universe,
             start_date=start_date,
-            end_date=end_date
+            end_date=end_date,
+            strategy_name="Fast EMA CrossOver Strategy"
         )
         
         if result.equity_curve:
@@ -230,31 +207,7 @@ def simple_example():
             # Generate simple PDF report
             print("\nGenerating PDF report...")
             try:
-                config = create_backtest_config(
-                    universe=universe,
-                    start_date=start_date,
-                    end_date=end_date,
-                    initial_cash=initial_cash,
-                    strategy_config={
-                        'name': 'Fast CrossOver Strategy',
-                        'position_size': 0.8,
-                        'type': 'EMA Crossover'
-                    },
-                    signals_config=[
-                        'EMA Signal (5, 20 periods)'
-                    ],
-                    broker_config={
-                        'commission': 0.0005,
-                        'slippage': 0.0002,
-                        'type': 'SimpleBroker'
-                    },
-                    benchmark_config={
-                        'name': 'Buy and Hold',
-                        'allocation_method': 'equal_weight'
-                    } if result.benchmark_equity_curve else None
-                )
-                
-                report = SummaryReport(result, config)
+                report = SummaryReport(result)
                 pdf_filename = report.generate_pdf("simple_backtest_report.pdf")
                 print(f"Simple PDF report saved as: {pdf_filename}")
                 
