@@ -19,6 +19,10 @@ class BacktestResult:
         self.end_date: Optional[datetime] = None
         self.initial_cash: float = 0.0
         self.final_equity: float = 0.0
+        # Benchmark data
+        self.benchmark_equity_curve: List[Dict[str, Any]] = []
+        self.benchmark_trades: List[Fill] = []
+        self.benchmark_final_equity: float = 0.0
         
     def to_dataframe(self) -> pd.DataFrame:
         """Convert equity curve to DataFrame."""
@@ -52,6 +56,16 @@ class BacktestResult:
             df['Date'] = pd.to_datetime(df['Date'])
             df.set_index('Date', inplace=True)
         return df
+    
+    def get_benchmark_dataframe(self) -> pd.DataFrame:
+        """Convert benchmark equity curve to DataFrame."""
+        if not self.benchmark_equity_curve:
+            return pd.DataFrame()
+        
+        df = pd.DataFrame(self.benchmark_equity_curve)
+        df['Date'] = pd.to_datetime(df['Date'])
+        df.set_index('Date', inplace=True)
+        return df
 
 
 class Backtester:
@@ -65,7 +79,8 @@ class Backtester:
         signal_generators: List[SignalGenerator],
         strategy: Strategy,
         broker: Broker,
-        initial_cash: float = 100000.0
+        initial_cash: float = 100000.0,
+        benchmark_strategy: Optional[Strategy] = None
     ):
         """
         Initialize backtester.
@@ -76,12 +91,14 @@ class Backtester:
             strategy: Trading strategy
             broker: Order execution broker
             initial_cash: Starting cash amount
+            benchmark_strategy: Optional benchmark strategy (e.g., buy and hold)
         """
         self.data_source = data_source
         self.signal_generators = signal_generators
         self.strategy = strategy
         self.broker = broker
         self.initial_cash = initial_cash
+        self.benchmark_strategy = benchmark_strategy
     
     def run(
         self,
@@ -109,6 +126,11 @@ class Backtester:
         
         # Initialize portfolio state
         state = PortfolioState(cash=self.initial_cash)
+        
+        # Initialize benchmark state if benchmark strategy is provided
+        benchmark_state = None
+        if self.benchmark_strategy:
+            benchmark_state = PortfolioState(cash=self.initial_cash)
         
         # Get market data
         print(f"Fetching data for {universe} from {start_date} to {end_date}...")
@@ -156,6 +178,14 @@ class Backtester:
                     fills = self.broker.execute(orders, current_prices, state)
                     result.trades.extend(fills)
 
+                # Run benchmark strategy if provided
+                if self.benchmark_strategy and benchmark_state:
+                    benchmark_orders = self.benchmark_strategy.on_bar(date, symbol_data, benchmark_state)
+                    if benchmark_orders:
+                        current_prices = symbol_data['Close'].to_dict() if 'Close' in symbol_data.columns else {}
+                        benchmark_fills = self.broker.execute(benchmark_orders, current_prices, benchmark_state)
+                        result.benchmark_trades.extend(benchmark_fills)
+
                 # Record portfolio state
                 current_prices = symbol_data['Close'].to_dict() if 'Close' in symbol_data.columns else {}
                 total_equity = state.get_total_equity(current_prices)
@@ -166,6 +196,16 @@ class Backtester:
                     'Equity': total_equity,
                     'Positions': len(state.positions)
                 })
+
+                # Record benchmark state
+                if benchmark_state:
+                    benchmark_equity = benchmark_state.get_total_equity(current_prices)
+                    result.benchmark_equity_curve.append({
+                        'Date': date,
+                        'Cash': benchmark_state.cash,
+                        'Equity': benchmark_equity,
+                        'Positions': len(benchmark_state.positions)
+                    })
 
                 result.portfolio_history.append({
                     'Date': date,
@@ -183,8 +223,18 @@ class Backtester:
         if result.equity_curve:
             result.final_equity = result.equity_curve[-1]['Equity']
         
+        # Set benchmark final equity
+        if result.benchmark_equity_curve:
+            result.benchmark_final_equity = result.benchmark_equity_curve[-1]['Equity']
+        
         print(f"Backtest completed. Final equity: ${result.final_equity:,.2f}")
         print(f"Total return: {((result.final_equity / result.initial_cash - 1) * 100):.2f}%")
         print(f"Number of trades: {len(result.trades)}")
+        
+        if result.benchmark_equity_curve:
+            benchmark_return = ((result.benchmark_final_equity / result.initial_cash - 1) * 100)
+            print(f"Benchmark (Buy & Hold) return: {benchmark_return:.2f}%")
+            alpha = ((result.final_equity / result.initial_cash - 1) - (result.benchmark_final_equity / result.initial_cash - 1)) * 100
+            print(f"Alpha vs Benchmark: {alpha:.2f}%")
         
         return result

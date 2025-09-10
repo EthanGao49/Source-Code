@@ -8,12 +8,13 @@ class PerformanceMetrics:
     """Performance metrics calculator for backtest results."""
     
     @staticmethod
-    def calculate_metrics(result: BacktestResult) -> Dict[str, Any]:
+    def calculate_metrics(result: BacktestResult, include_benchmark: bool = True) -> Dict[str, Any]:
         """
         Calculate comprehensive performance metrics.
         
         Args:
             result: BacktestResult object
+            include_benchmark: Whether to include benchmark comparison metrics
             
         Returns:
             Dictionary of performance metrics
@@ -64,7 +65,7 @@ class PerformanceMetrics:
         # VaR (Value at Risk) - 5% VaR
         var_5 = np.percentile(daily_returns, 5) if len(daily_returns) > 0 else 0
         
-        return {
+        metrics = {
             'Total Return (%)': total_return * 100,
             'Annualized Return (%)': annualized_return * 100,
             'Annualized Volatility (%)': annualized_volatility * 100,
@@ -83,6 +84,69 @@ class PerformanceMetrics:
             'Trading Days': days,
             'Years': years
         }
+        
+        # Add benchmark comparison metrics if available
+        if include_benchmark and result.benchmark_equity_curve:
+            benchmark_df = result.get_benchmark_dataframe()
+            benchmark_equity = benchmark_df['Equity']
+            
+            # Benchmark metrics
+            benchmark_total_return = (result.benchmark_final_equity / result.initial_cash) - 1
+            benchmark_annualized_return = (1 + benchmark_total_return) ** (1/years) - 1 if years > 0 else 0
+            benchmark_daily_returns = benchmark_equity.pct_change().dropna()
+            benchmark_volatility = benchmark_daily_returns.std() * np.sqrt(252) if len(benchmark_daily_returns) > 1 else 0
+            benchmark_sharpe = benchmark_annualized_return / benchmark_volatility if benchmark_volatility > 0 else 0
+            
+            # Benchmark drawdown
+            benchmark_running_max = benchmark_equity.expanding().max()
+            benchmark_drawdown = (benchmark_equity - benchmark_running_max) / benchmark_running_max
+            benchmark_max_drawdown = benchmark_drawdown.min()
+            
+            # Comparison metrics
+            alpha = (annualized_return - benchmark_annualized_return) * 100
+            
+            # Beta calculation (if we have enough data)
+            beta = 0
+            if len(daily_returns) > 1 and len(benchmark_daily_returns) > 1:
+                # Align the returns by date
+                aligned_returns = pd.DataFrame({
+                    'strategy': daily_returns,
+                    'benchmark': benchmark_daily_returns
+                }).dropna()
+                
+                if len(aligned_returns) > 1:
+                    cov_matrix = np.cov(aligned_returns['strategy'], aligned_returns['benchmark'])
+                    if len(cov_matrix) == 2 and len(cov_matrix[0]) == 2:
+                        beta = cov_matrix[0, 1] / np.var(aligned_returns['benchmark']) if np.var(aligned_returns['benchmark']) != 0 else 0
+            
+            # Information ratio
+            tracking_error = 0
+            information_ratio = 0
+            if len(daily_returns) > 1 and len(benchmark_daily_returns) > 1:
+                aligned_returns = pd.DataFrame({
+                    'strategy': daily_returns,
+                    'benchmark': benchmark_daily_returns
+                }).dropna()
+                
+                if len(aligned_returns) > 1:
+                    excess_returns = aligned_returns['strategy'] - aligned_returns['benchmark']
+                    tracking_error = excess_returns.std() * np.sqrt(252)
+                    information_ratio = alpha / 100 / tracking_error if tracking_error != 0 else 0
+            
+            # Add benchmark metrics
+            metrics.update({
+                'Benchmark Total Return (%)': benchmark_total_return * 100,
+                'Benchmark Annualized Return (%)': benchmark_annualized_return * 100,
+                'Benchmark Volatility (%)': benchmark_volatility * 100,
+                'Benchmark Sharpe Ratio': benchmark_sharpe,
+                'Benchmark Max Drawdown (%)': benchmark_max_drawdown * 100,
+                'Alpha (%)': alpha,
+                'Beta': beta,
+                'Tracking Error (%)': tracking_error * 100,
+                'Information Ratio': information_ratio
+            })
+        
+        return metrics
     
     @staticmethod
     def _calculate_drawdown_duration(drawdown: pd.Series) -> int:

@@ -19,6 +19,7 @@ sys.path.append('..')
 from qbt.data.yfinance_source import YFDataSource
 from qbt.signals.ema import EMASignal
 from qbt.strategy.cross_over import CrossOverStrategy
+from qbt.strategy.buy_and_hold import BuyAndHoldStrategy
 from qbt.execution.simple_broker import SimpleBroker
 from qbt.engine.backtester import Backtester
 from qbt.engine.metrics import PerformanceMetrics
@@ -56,6 +57,9 @@ def main():
         # Strategy
         strategy = CrossOverStrategy(position_size=0.3)  # 30% per position
         
+        # Benchmark strategy (buy and hold)
+        benchmark_strategy = BuyAndHoldStrategy(allocation_method="equal_weight")
+        
         # Broker
         broker = SimpleBroker(commission=0.001, slippage=0.0005)
         
@@ -65,7 +69,8 @@ def main():
             signal_generators=signal_generators,
             strategy=strategy,
             broker=broker,
-            initial_cash=initial_cash
+            initial_cash=initial_cash,
+            benchmark_strategy=benchmark_strategy
         )
         
         print("Components initialized successfully!")
@@ -149,6 +154,7 @@ def simple_example():
         data_source = YFDataSource()
         ema_signal = EMASignal(short_period=5, long_period=20)  # Faster signals
         strategy = CrossOverStrategy(position_size=0.8)  # More aggressive
+        benchmark_strategy = BuyAndHoldStrategy(allocation_method="equal_weight")
         broker = SimpleBroker(commission=0.0005, slippage=0.0002)  # Lower costs
         
         # Backtester
@@ -157,7 +163,8 @@ def simple_example():
             signal_generators=[ema_signal],
             strategy=strategy,
             broker=broker,
-            initial_cash=initial_cash
+            initial_cash=initial_cash,
+            benchmark_strategy=benchmark_strategy
         )
         
         # Run backtest

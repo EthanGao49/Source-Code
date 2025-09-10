@@ -44,6 +44,13 @@ class Visualizer:
             ax.plot(benchmark.index, benchmark.values, label='Benchmark', 
                    linewidth=2, color='gray', alpha=0.7)
         
+        # Plot built-in benchmark if available
+        elif result.benchmark_equity_curve:
+            benchmark_df = result.get_benchmark_dataframe()
+            if not benchmark_df.empty:
+                ax.plot(benchmark_df.index, benchmark_df['Equity'], label='Buy & Hold Benchmark', 
+                       linewidth=2, color='red', alpha=0.7, linestyle='--')
+        
         # Formatting
         ax.set_title(title, fontsize=16, fontweight='bold')
         ax.set_xlabel('Date', fontsize=12)
