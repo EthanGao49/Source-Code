@@ -13,7 +13,8 @@ class Broker(ABC):
         self,
         orders: List[Order],
         prices_today: Dict[str, float],
-        state: PortfolioState
+        state: PortfolioState,
+        current_date: datetime
     ) -> List[Fill]:
         """
         Execute orders and return fills.
@@ -22,6 +23,7 @@ class Broker(ABC):
             orders: List of orders to execute
             prices_today: Current market prices by symbol
             state: Current portfolio state
+            current_date: Current trading date
             
         Returns:
             List of executed fills

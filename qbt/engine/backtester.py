@@ -175,7 +175,7 @@ class Backtester:
                 # Execute orders
                 if orders:
                     current_prices = symbol_data['Close'].to_dict() if 'Close' in symbol_data.columns else {}
-                    fills = self.broker.execute(orders, current_prices, state)
+                    fills = self.broker.execute(orders, current_prices, state, date)
                     result.trades.extend(fills)
 
                 # Run benchmark strategy if provided
@@ -183,7 +183,7 @@ class Backtester:
                     benchmark_orders = self.benchmark_strategy.on_bar(date, symbol_data, benchmark_state)
                     if benchmark_orders:
                         current_prices = symbol_data['Close'].to_dict() if 'Close' in symbol_data.columns else {}
-                        benchmark_fills = self.broker.execute(benchmark_orders, current_prices, benchmark_state)
+                        benchmark_fills = self.broker.execute(benchmark_orders, current_prices, benchmark_state, date)
                         result.benchmark_trades.extend(benchmark_fills)
 
                 # Record portfolio state

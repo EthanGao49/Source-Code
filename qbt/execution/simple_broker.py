@@ -28,7 +28,8 @@ class SimpleBroker(Broker):
         self,
         orders: List[Order],
         prices_today: Dict[str, float],
-        state: PortfolioState
+        state: PortfolioState,
+        current_date: datetime
     ) -> List[Fill]:
         """
         Execute market orders with fees and slippage.
@@ -37,6 +38,7 @@ class SimpleBroker(Broker):
             orders: List of orders to execute
             prices_today: Current market prices by symbol
             state: Current portfolio state
+            current_date: Current trading date
             
         Returns:
             List of executed fills
@@ -88,7 +90,7 @@ class SimpleBroker(Broker):
                 price=execution_price,
                 fees=fees,
                 slippage=abs(order.quantity) * abs(slippage_amount),
-                timestamp=datetime.now()
+                timestamp=current_date
             )
             
             # Update portfolio state

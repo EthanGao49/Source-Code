@@ -74,7 +74,8 @@ class BuyAndHoldStrategy(Strategy):
                                 orders.append(Order(
                                     symbol=symbol,
                                     quantity=shares_to_buy,
-                                    order_type="market"
+                                    order_type="market",
+                                    timestamp=date
                                 ))
             
             self.initial_purchase_made = True

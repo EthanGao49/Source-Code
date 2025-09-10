@@ -77,19 +77,19 @@ class CrossOverStrategy(Strategy):
                     if current_position <= 0:  # Not currently long
                         # Close any short position first
                         if current_position < 0:
-                            orders.append(Order(symbol, -current_position))
+                            orders.append(Order(symbol, -current_position, timestamp=date))
                         
                         # Calculate position size
                         position_value = total_equity * self.position_size
                         shares_to_buy = int(position_value / current_price)
                         
                         if shares_to_buy > 0 and position_value <= state.cash:
-                            orders.append(Order(symbol, shares_to_buy))
+                            orders.append(Order(symbol, shares_to_buy, timestamp=date))
                 
                 # Sell signal: short EMA crossed below long EMA
                 elif current_signal == 0 and previous_signal == 1:
                     if current_position > 0:  # Currently long
-                        orders.append(Order(symbol, -current_position))
+                        orders.append(Order(symbol, -current_position, timestamp=date))
             
             # Update previous signal
             self.previous_signals[symbol] = current_signal

@@ -24,6 +24,7 @@ from qbt.execution.simple_broker import SimpleBroker
 from qbt.engine.backtester import Backtester
 from qbt.engine.metrics import PerformanceMetrics
 from qbt.engine.viz import Visualizer
+from qbt.engine.summary import SummaryReport, create_backtest_config
 
 
 def main():
@@ -61,7 +62,7 @@ def main():
         benchmark_strategy = BuyAndHoldStrategy(allocation_method="equal_weight")
         
         # Broker
-        broker = SimpleBroker(commission=0.001, slippage=0)
+        broker = SimpleBroker(commission=0, slippage=0)
         
         # Backtester
         backtester = Backtester(
@@ -122,6 +123,44 @@ def main():
                 plt.show()
             except Exception as e:
                 print(f"Could not generate monthly returns heatmap: {e}")
+            
+            # Generate PDF report
+            print("\nGenerating PDF report...")
+            try:
+                # Create configuration for report
+                config = create_backtest_config(
+                    universe=universe,
+                    start_date=start_date,
+                    end_date=end_date,
+                    initial_cash=initial_cash,
+                    strategy_config={
+                        'name': 'CrossOver Strategy',
+                        'position_size': 0.3,
+                        'type': 'EMA Crossover'
+                    },
+                    signals_config=[
+                        'EMA Signal (12, 26 periods)'
+                    ],
+                    broker_config={
+                        'commission': 0,
+                        'slippage': 0,
+                        'type': 'SimpleBroker'
+                    },
+                    benchmark_config={
+                        'name': 'Buy and Hold',
+                        'allocation_method': 'equal_weight'
+                    } if result.benchmark_equity_curve else None
+                )
+                
+                # Generate report
+                report = SummaryReport(result, config)
+                pdf_filename = report.generate_pdf()
+                print(f"PDF report saved as: {pdf_filename}")
+                
+            except Exception as e:
+                print(f"Error generating PDF report: {e}")
+                import traceback
+                traceback.print_exc()
             
             print("\nBacktest completed successfully!")
             
@@ -187,6 +226,40 @@ def simple_example():
             # Simple equity plot
             fig = Visualizer.plot_equity_curve(result, title="Simple AAPL Backtest")
             plt.show()
+            
+            # Generate simple PDF report
+            print("\nGenerating PDF report...")
+            try:
+                config = create_backtest_config(
+                    universe=universe,
+                    start_date=start_date,
+                    end_date=end_date,
+                    initial_cash=initial_cash,
+                    strategy_config={
+                        'name': 'Fast CrossOver Strategy',
+                        'position_size': 0.8,
+                        'type': 'EMA Crossover'
+                    },
+                    signals_config=[
+                        'EMA Signal (5, 20 periods)'
+                    ],
+                    broker_config={
+                        'commission': 0.0005,
+                        'slippage': 0.0002,
+                        'type': 'SimpleBroker'
+                    },
+                    benchmark_config={
+                        'name': 'Buy and Hold',
+                        'allocation_method': 'equal_weight'
+                    } if result.benchmark_equity_curve else None
+                )
+                
+                report = SummaryReport(result, config)
+                pdf_filename = report.generate_pdf("simple_backtest_report.pdf")
+                print(f"Simple PDF report saved as: {pdf_filename}")
+                
+            except Exception as e:
+                print(f"Error generating PDF report: {e}")
             
         else:
             print("No results generated.")

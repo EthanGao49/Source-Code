@@ -10,10 +10,6 @@ class Order:
     quantity: int  # positive for buy, negative for sell
     order_type: str = "market"  # market, limit, etc.
     timestamp: Optional[datetime] = None
-    
-    def __post_init__(self):
-        if self.timestamp is None:
-            self.timestamp = datetime.now()
 
 
 @dataclass
