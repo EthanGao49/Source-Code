@@ -131,49 +131,50 @@ class Backtester:
         # Run backtest day by day
         for i, date in enumerate(dates):
             try:
-                # Get data for current date
-                current_data = prices_df.loc[date]
+                # Get current date data
+                current_data = prices_df.loc[pd.IndexSlice[date, :], :]
                 
-                # Handle single symbol case
-                if not isinstance(current_data.index, pd.MultiIndex):
-                    current_data = pd.DataFrame([current_data], index=[universe[0]])
-                    current_data.index.name = 'Symbol'
+                # Reset the index to make symbols the index (remove date level)
+                if current_data.index.nlevels > 1:
+                    current_data = current_data.reset_index(level=0, drop=True)
                 
-                # Convert to series indexed by symbol for strategy
-                if isinstance(current_data.index, pd.MultiIndex):
-                    symbol_data = current_data.reset_index(level=0, drop=True)
-                else:
-                    symbol_data = current_data
+                # Ensure we have a proper DataFrame
+                if isinstance(current_data, pd.Series):
+                    current_data = current_data.to_frame().T
                 
-                # Generate orders from strategy
+                if current_data.empty:
+                    continue
+                
+                symbol_data = current_data
+
+                # Generate orders
                 orders = self.strategy.on_bar(date, symbol_data, state)
-                
-                # Execute orders through broker
+
+                # Execute orders
                 if orders:
                     current_prices = symbol_data['Close'].to_dict() if 'Close' in symbol_data.columns else {}
                     fills = self.broker.execute(orders, current_prices, state)
                     result.trades.extend(fills)
-                
+
                 # Record portfolio state
                 current_prices = symbol_data['Close'].to_dict() if 'Close' in symbol_data.columns else {}
                 total_equity = state.get_total_equity(current_prices)
-                
+
                 result.equity_curve.append({
                     'Date': date,
                     'Cash': state.cash,
                     'Equity': total_equity,
                     'Positions': len(state.positions)
                 })
-                
+
                 result.portfolio_history.append({
                     'Date': date,
                     'State': state.copy()
                 })
-                
-                # Progress update
+
                 if (i + 1) % 50 == 0:
                     print(f"Processed {i + 1}/{len(dates)} days...")
-                    
+
             except Exception as e:
                 print(f"Error processing date {date}: {e}")
                 continue
