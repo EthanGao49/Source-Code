@@ -44,7 +44,21 @@ class Visualizer:
             ax.plot(benchmark.index, benchmark.values, label='Benchmark', 
                    linewidth=2, color='gray', alpha=0.7)
         
-        # Plot built-in benchmark if available
+        # Plot multiple benchmarks if available
+        elif result.benchmarks:
+            colors = ['red', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive']
+            linestyles = ['--', '-.', ':', '-', '--', '-.', ':']
+            
+            for i, benchmark_name in enumerate(result.get_benchmark_names()):
+                benchmark_df = result.get_benchmark_dataframe(benchmark_name)
+                if not benchmark_df.empty:
+                    color = colors[i % len(colors)]
+                    linestyle = linestyles[i % len(linestyles)]
+                    ax.plot(benchmark_df.index, benchmark_df['Equity'], 
+                           label=f'{benchmark_name} Benchmark', 
+                           linewidth=2, color=color, alpha=0.7, linestyle=linestyle)
+        
+        # Legacy single benchmark support
         elif result.benchmark_equity_curve:
             benchmark_df = result.get_benchmark_dataframe()
             if not benchmark_df.empty:
@@ -385,9 +399,24 @@ class Visualizer:
         
         if not df.empty:
             ax1.plot(df.index, df['Equity'], label='Portfolio', linewidth=2, color='blue')
+            
+            # Handle multiple benchmarks
             if benchmark is not None:
                 ax1.plot(benchmark.index, benchmark.values, label='Benchmark', 
                         linewidth=2, color='gray', alpha=0.7)
+            elif result.benchmarks:
+                colors = ['red', 'orange', 'purple', 'brown', 'pink']
+                linestyles = ['--', '-.', ':', '-', '--']
+                
+                for i, benchmark_name in enumerate(result.get_benchmark_names()):
+                    benchmark_df = result.get_benchmark_dataframe(benchmark_name)
+                    if not benchmark_df.empty:
+                        color = colors[i % len(colors)]
+                        linestyle = linestyles[i % len(linestyles)]
+                        ax1.plot(benchmark_df.index, benchmark_df['Equity'], 
+                               label=f'{benchmark_name}', 
+                               linewidth=2, color=color, alpha=0.7, linestyle=linestyle)
+            
             ax1.set_title('Portfolio Equity Curve', fontsize=16, fontweight='bold')
             ax1.set_ylabel('Portfolio Value ($)', fontsize=12)
             ax1.grid(True, alpha=0.3)

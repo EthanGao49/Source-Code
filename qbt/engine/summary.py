@@ -23,7 +23,13 @@ class SummaryReport:
         """
         self.result = result
         self.config = result.config
-        self.metrics = PerformanceMetrics.calculate_metrics(result)
+        # Calculate metrics for all benchmarks if multiple exist, otherwise use single benchmark
+        if result.benchmarks:
+            self.all_metrics = PerformanceMetrics.calculate_all_benchmark_metrics(result)
+            self.metrics = None  # Will use all_metrics instead
+        else:
+            self.metrics = PerformanceMetrics.calculate_metrics(result)
+            self.all_metrics = None
         
     def generate_pdf(self, filename: str = None) -> str:
         """
@@ -50,26 +56,62 @@ class SummaryReport:
             self._create_metrics_page(pdf)
             
             # Benchmark comparison (if available)
-            if self.result.benchmark_equity_curve:
-                self._create_benchmark_comparison_page(pdf)
+            has_benchmarks = bool(self.result.benchmark_equity_curve or self.result.benchmarks)
+            if has_benchmarks:
+                if self.result.benchmarks:
+                    # Multiple benchmarks - table already created in metrics page
+                    pass
+                else:
+                    # Single benchmark - create comparison page
+                    self._create_benchmark_comparison_page(pdf)
             
             # Equity curve and visualizations
-            self._create_equity_plots_page(pdf)
+            try:
+                print("Creating equity plots page...")
+                self._create_equity_plots_page(pdf)
+                print("✓ Equity plots page created")
+            except Exception as e:
+                print(f"✗ Error creating equity plots page: {e}")
             
             # Signal analysis
-            self._create_signals_page(pdf)
+            try:
+                print("Creating signals page...")
+                self._create_signals_page(pdf)
+                print("✓ Signals page created")
+            except Exception as e:
+                print(f"✗ Error creating signals page: {e}")
             
             # Drawdown analysis
-            self._create_drawdown_page(pdf)
+            try:
+                print("Creating drawdown page...")
+                self._create_drawdown_page(pdf)
+                print("✓ Drawdown page created")
+            except Exception as e:
+                print(f"✗ Error creating drawdown page: {e}")
             
             # Returns analysis
-            self._create_returns_page(pdf)
+            try:
+                print("Creating returns page...")
+                self._create_returns_page(pdf)
+                print("✓ Returns page created")
+            except Exception as e:
+                print(f"✗ Error creating returns page: {e}")
             
             # Order history
-            self._create_order_history_page(pdf)
+            try:
+                print("Creating order history page...")
+                self._create_order_history_page(pdf)
+                print("✓ Order history page created")
+            except Exception as e:
+                print(f"✗ Error creating order history page: {e}")
             
             # Trade analysis
-            self._create_trade_analysis_page(pdf)
+            try:
+                print("Creating trade analysis page...")
+                self._create_trade_analysis_page(pdf)
+                print("✓ Trade analysis page created")
+            except Exception as e:
+                print(f"✗ Error creating trade analysis page: {e}")
             
             # Monthly performance heatmap
             try:
@@ -158,14 +200,32 @@ class SummaryReport:
         for key, value in broker_config.items():
             config_lines.append(f"{key}: {value}")
         
-        # Benchmark configuration
-        if self.result.benchmark_equity_curve:
+        # Benchmark configuration - handle both single and multiple benchmarks
+        has_benchmarks = bool(self.result.benchmark_equity_curve or self.result.benchmarks)
+        
+        if has_benchmarks:
             config_lines.append("")
             config_lines.append("BENCHMARK CONFIGURATION")
             config_lines.append("=" * 50)
-            benchmark_config = self.config.get('benchmark', {})
-            for key, value in benchmark_config.items():
-                config_lines.append(f"{key}: {value}")
+            
+            # Multiple benchmarks (new system)
+            if self.result.benchmarks:
+                config_lines.append(f"Multiple Benchmarks: {len(self.result.benchmarks)}")
+                for i, benchmark_name in enumerate(self.result.get_benchmark_names(), 1):
+                    config_lines.append(f"{i}. {benchmark_name}")
+                    
+                    # Add benchmark details from config if available
+                    benchmark_configs = self.config.get('benchmarks', {})
+                    if benchmark_name in benchmark_configs:
+                        benchmark_config = benchmark_configs[benchmark_name]
+                        for key, value in benchmark_config.items():
+                            config_lines.append(f"   {key}: {value}")
+            
+            # Legacy single benchmark
+            elif self.result.benchmark_equity_curve:
+                benchmark_config = self.config.get('benchmark', {})
+                for key, value in benchmark_config.items():
+                    config_lines.append(f"{key}: {value}")
         
         config_text = '\n'.join(config_lines)
         ax.text(0.05, 0.9, config_text, ha='left', va='top', fontsize=10, 
@@ -176,6 +236,14 @@ class SummaryReport:
     
     def _create_metrics_page(self, pdf: PdfPages):
         """Create performance metrics page."""
+        # Handle multiple benchmarks vs single benchmark
+        if self.all_metrics:
+            self._create_multiple_benchmarks_metrics_pages(pdf)
+        else:
+            self._create_single_benchmark_metrics_page(pdf)
+    
+    def _create_single_benchmark_metrics_page(self, pdf: PdfPages):
+        """Create metrics page for single benchmark system."""
         fig, ax = plt.subplots(figsize=(8.5, 11))
         ax.axis('off')
         
@@ -227,6 +295,141 @@ class SummaryReport:
         metrics_text = '\n'.join(metrics_lines)
         ax.text(0.05, 0.9, metrics_text, ha='left', va='top', fontsize=11, 
                fontfamily='monospace', transform=ax.transAxes)
+        
+        pdf.savefig(fig, bbox_inches='tight')
+        plt.close(fig)
+    
+    def _create_multiple_benchmarks_metrics_pages(self, pdf: PdfPages):
+        """Create comprehensive comparison table for all benchmarks."""
+        self._create_benchmarks_comparison_table(pdf)
+        
+        # Also create individual benchmark comparison pages if needed
+        # (commented out since we now use the comparison table)
+        # for name, metrics in self.all_metrics.items():
+        #     if 'Strategy vs' in name:
+        #         self._create_individual_benchmark_page(pdf, name, metrics)
+    
+    def _create_benchmarks_comparison_table(self, pdf: PdfPages):
+        """Create a comparison table showing strategy vs all benchmarks."""
+        fig, ax = plt.subplots(figsize=(11, 8.5))  # Landscape orientation for table
+        ax.axis('off')
+        
+        ax.text(0.5, 0.95, 'Performance Comparison Table', 
+               ha='center', va='top', fontsize=18, fontweight='bold')
+        
+        # Prepare data for table
+        table_data = []
+        headers = ['Metric', 'Strategy']
+        
+        # Get strategy metrics from one of the comparison results
+        strategy_metrics = None
+        benchmark_names = []
+        
+        for name, metrics in self.all_metrics.items():
+            if 'Strategy vs' in name:
+                if strategy_metrics is None:
+                    strategy_metrics = metrics
+                benchmark_name = name.replace('Strategy vs ', '')
+                benchmark_names.append(benchmark_name)
+                headers.append(benchmark_name)
+        
+        if strategy_metrics is None:
+            # Fallback to standalone metrics if no comparison available
+            return
+        
+        # Define metrics to include in table
+        metric_rows = [
+            ('Total Return (%)', 'Total Return (%)'),
+            ('Annualized Return (%)', 'Annualized Return (%)'),
+            ('Annualized Volatility (%)', 'Annualized Volatility (%)'),
+            ('Sharpe Ratio', 'Sharpe Ratio'),
+            ('Maximum Drawdown (%)', 'Maximum Drawdown (%)'),
+            ('Calmar Ratio', 'Calmar Ratio'),
+            ('Final Equity ($)', 'Final Equity ($)'),
+            ('Total Trades', 'Total Trades'),
+            ('Years', 'Years')
+        ]
+        
+        # Build table rows
+        for display_name, metric_key in metric_rows:
+            row = [display_name]
+            
+            # Strategy value
+            strategy_value = strategy_metrics.get(metric_key, 0)
+            if metric_key == 'Final Equity ($)':
+                row.append(f"${strategy_value:,.0f}")
+            elif metric_key in ['Total Trades', 'Years']:
+                row.append(f"{strategy_value:.0f}" if metric_key == 'Total Trades' else f"{strategy_value:.1f}")
+            else:
+                row.append(f"{strategy_value:.2f}")
+            
+            # Benchmark values
+            for benchmark_name in benchmark_names:
+                # Get benchmark standalone metrics
+                standalone_metrics = self.all_metrics.get(f'{benchmark_name} Standalone', {})
+                benchmark_value = standalone_metrics.get(metric_key, 0)
+                
+                if metric_key == 'Final Equity ($)':
+                    row.append(f"${benchmark_value:,.0f}")
+                elif metric_key in ['Total Trades', 'Years']:
+                    row.append(f"{benchmark_value:.0f}" if metric_key == 'Total Trades' else f"{benchmark_value:.1f}")
+                else:
+                    row.append(f"{benchmark_value:.2f}")
+            
+            table_data.append(row)
+        
+        # Add benchmark comparison metrics
+        if len(benchmark_names) > 0:
+            table_data.append(['', ''] + [''] * len(benchmark_names))  # Empty row
+            table_data.append(['BENCHMARK COMPARISON', ''] + [''] * len(benchmark_names))
+            
+            comparison_metrics = [
+                ('Alpha (%)', 'Alpha (%)'),
+                ('Beta', 'Beta'),
+                ('Tracking Error (%)', 'Tracking Error (%)'),
+                ('Information Ratio', 'Information Ratio')
+            ]
+            
+            for display_name, metric_key in comparison_metrics:
+                row = [display_name, '']  # Strategy column empty for comparison metrics
+                
+                for benchmark_name in benchmark_names:
+                    comparison_data = self.all_metrics.get(f'Strategy vs {benchmark_name}', {})
+                    value = comparison_data.get(metric_key, 0)
+                    row.append(f"{value:.2f}")
+                
+                table_data.append(row)
+        
+        # Create table
+        table = ax.table(cellText=table_data,
+                        colLabels=headers,
+                        cellLoc='center',
+                        loc='center',
+                        bbox=[0.05, 0.15, 0.9, 0.7])
+        
+        # Style the table
+        table.auto_set_font_size(False)
+        table.set_fontsize(9)
+        table.scale(1, 2.5)
+        
+        # Style header row
+        for i in range(len(headers)):
+            table[(0, i)].set_facecolor('#40466e')
+            table[(0, i)].set_text_props(weight='bold', color='white')
+        
+        # Style metric category rows
+        for i, row in enumerate(table_data, 1):
+            if row[0] == 'BENCHMARK COMPARISON':
+                for j in range(len(headers)):
+                    table[(i, j)].set_facecolor('#e6e6e6')
+                    table[(i, j)].set_text_props(weight='bold')
+        
+        # Alternate row colors for better readability
+        for i in range(1, len(table_data) + 1):
+            if table_data[i-1][0] not in ['', 'BENCHMARK COMPARISON']:
+                if i % 2 == 0:
+                    for j in range(len(headers)):
+                        table[(i, j)].set_facecolor('#f8f9fa')
         
         pdf.savefig(fig, bbox_inches='tight')
         plt.close(fig)
