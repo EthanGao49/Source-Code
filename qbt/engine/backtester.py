@@ -25,6 +25,8 @@ class BacktestResult:
         self.benchmark_final_equity: float = 0.0
         # Configuration data
         self.config: Dict[str, Any] = {}
+        # Market data with signals
+        self.market_data: Optional[pd.DataFrame] = None
         
     def to_dataframe(self) -> pd.DataFrame:
         """Convert equity curve to DataFrame."""
@@ -158,6 +160,9 @@ class Backtester:
         print("Generating signals...")
         for signal_generator in self.signal_generators:
             prices_df = signal_generator.transform(prices_df)
+        
+        # Store market data with signals for visualization
+        result.market_data = prices_df.copy()
         
         # Get unique dates
         dates = prices_df.index.get_level_values('Date').unique().sort_values()

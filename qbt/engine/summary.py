@@ -56,6 +56,9 @@ class SummaryReport:
             # Equity curve and visualizations
             self._create_equity_plots_page(pdf)
             
+            # Signal analysis
+            self._create_signals_page(pdf)
+            
             # Drawdown analysis
             self._create_drawdown_page(pdf)
             
@@ -293,6 +296,39 @@ class SummaryReport:
             plt.close(fig)
         except Exception as e:
             print(f"Could not generate comprehensive analysis plot: {e}")
+    
+    def _create_signals_page(self, pdf: PdfPages):
+        """Create signals analysis page."""
+        try:
+            # Get available symbols
+            if self.result.market_data is not None:
+                available_symbols = self.result.market_data.index.get_level_values('Symbol').unique()
+                
+                # Create signal plots for up to 3 symbols
+                symbols_to_plot = available_symbols[:3]
+                
+                for symbol in symbols_to_plot:
+                    fig = Visualizer.plot_signals(self.result, symbol=symbol)
+                    pdf.savefig(fig, bbox_inches='tight')
+                    plt.close(fig)
+            else:
+                # Create empty page with message
+                fig, ax = plt.subplots(figsize=(8.5, 11))
+                ax.axis('off')
+                ax.text(0.5, 0.5, 'No signal data available for visualization', 
+                       ha='center', va='center', fontsize=16, transform=ax.transAxes)
+                pdf.savefig(fig, bbox_inches='tight')
+                plt.close(fig)
+                
+        except Exception as e:
+            print(f"Could not generate signals plot: {e}")
+            # Create error page
+            fig, ax = plt.subplots(figsize=(8.5, 11))
+            ax.axis('off')
+            ax.text(0.5, 0.5, f'Error generating signals plot: {e}', 
+                   ha='center', va='center', fontsize=12, transform=ax.transAxes)
+            pdf.savefig(fig, bbox_inches='tight')
+            plt.close(fig)
     
     def _create_drawdown_page(self, pdf: PdfPages):
         """Create drawdown analysis page."""

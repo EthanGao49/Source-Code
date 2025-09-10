@@ -112,6 +112,10 @@ def main():
             fig_equity = Visualizer.plot_equity_curve(result)
             plt.show()
             
+            # Signal analysis plot
+            fig_signals = Visualizer.plot_signals(result)
+            plt.show()
+            
             fig_drawdown = Visualizer.plot_drawdown(result)
             plt.show()
             
@@ -202,6 +206,10 @@ def simple_example():
             
             # Simple equity plot
             fig = Visualizer.plot_equity_curve(result, title="Simple AAPL Backtest")
+            plt.show()
+            
+            # Simple signals plot
+            fig_signals = Visualizer.plot_signals(result, title="AAPL Trading Signals")
             plt.show()
             
             # Generate simple PDF report

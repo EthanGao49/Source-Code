@@ -70,6 +70,129 @@ class Visualizer:
         return fig
     
     @staticmethod
+    def plot_signals(
+        result: BacktestResult,
+        symbol: str = None,
+        title: str = None,
+        figsize: Tuple[int, int] = (14, 8)
+    ) -> plt.Figure:
+        """
+        Plot price data with buy/sell signals.
+        
+        Args:
+            result: BacktestResult object
+            symbol: Symbol to plot (if None, uses first symbol)
+            title: Plot title
+            figsize: Figure size
+            
+        Returns:
+            Matplotlib figure
+        """
+        if result.market_data is None or result.market_data.empty:
+            fig, ax = plt.subplots(figsize=figsize)
+            ax.text(0.5, 0.5, 'No market data available for signal plotting', 
+                   ha='center', va='center', transform=ax.transAxes)
+            return fig
+        
+        # Get available symbols
+        available_symbols = result.market_data.index.get_level_values('Symbol').unique()
+        if len(available_symbols) == 0:
+            fig, ax = plt.subplots(figsize=figsize)
+            ax.text(0.5, 0.5, 'No symbols available in market data', 
+                   ha='center', va='center', transform=ax.transAxes)
+            return fig
+        
+        # Select symbol to plot
+        if symbol is None:
+            symbol = available_symbols[0]
+        elif symbol not in available_symbols:
+            fig, ax = plt.subplots(figsize=figsize)
+            ax.text(0.5, 0.5, f'Symbol {symbol} not found in market data', 
+                   ha='center', va='center', transform=ax.transAxes)
+            return fig
+        
+        # Extract data for the symbol
+        symbol_data = result.market_data.loc[pd.IndexSlice[:, symbol], :].copy()
+        symbol_data = symbol_data.reset_index(level='Symbol', drop=True)  # Remove symbol level
+        
+        if symbol_data.empty:
+            fig, ax = plt.subplots(figsize=figsize)
+            ax.text(0.5, 0.5, f'No data available for symbol {symbol}', 
+                   ha='center', va='center', transform=ax.transAxes)
+            return fig
+        
+        # Create subplots
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, height_ratios=[3, 1])
+        
+        # Plot price data
+        ax1.plot(symbol_data.index, symbol_data['Close'], label='Close Price', 
+                linewidth=1.5, color='black')
+        
+        # Plot EMAs if available
+        if 'EMA_short' in symbol_data.columns:
+            ax1.plot(symbol_data.index, symbol_data['EMA_short'], 
+                    label='EMA Short', linewidth=1, color='blue', alpha=0.7)
+        if 'EMA_long' in symbol_data.columns:
+            ax1.plot(symbol_data.index, symbol_data['EMA_long'], 
+                    label='EMA Long', linewidth=1, color='red', alpha=0.7)
+        
+        # Get trade data for this symbol
+        trades_df = result.get_trades_dataframe()
+        if not trades_df.empty:
+            symbol_trades = trades_df[trades_df['Symbol'] == symbol]
+            
+            # Separate buy and sell trades
+            buy_trades = symbol_trades[symbol_trades['Quantity'] > 0]
+            sell_trades = symbol_trades[symbol_trades['Quantity'] < 0]
+            
+            # Plot buy signals
+            if not buy_trades.empty:
+                ax1.scatter(buy_trades.index, buy_trades['Price'], 
+                          marker='^', color='green', s=100, 
+                          label='Buy Signal', zorder=5)
+            
+            # Plot sell signals  
+            if not sell_trades.empty:
+                ax1.scatter(sell_trades.index, sell_trades['Price'], 
+                          marker='v', color='red', s=100, 
+                          label='Sell Signal', zorder=5)
+        
+        # Formatting for price plot
+        plot_title = title or f'{symbol} - Price and Signals'
+        ax1.set_title(plot_title, fontsize=16, fontweight='bold')
+        ax1.set_ylabel('Price ($)', fontsize=12)
+        ax1.grid(True, alpha=0.3)
+        ax1.legend()
+        
+        # Format y-axis
+        ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x:.2f}'))
+        
+        # Plot signal values in bottom subplot
+        if 'EMA_Signal' in symbol_data.columns:
+            ax2.plot(symbol_data.index, symbol_data['EMA_Signal'], 
+                    label='EMA Signal', linewidth=2, color='purple')
+            ax2.fill_between(symbol_data.index, symbol_data['EMA_Signal'], 
+                           alpha=0.3, color='purple')
+            ax2.set_ylabel('Signal', fontsize=12)
+            ax2.set_ylim(-0.1, 1.1)
+            ax2.grid(True, alpha=0.3)
+            ax2.legend()
+        else:
+            ax2.text(0.5, 0.5, 'No signal data available', 
+                    ha='center', va='center', transform=ax2.transAxes)
+        
+        # Format x-axis dates
+        for ax in [ax1, ax2]:
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+            ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+            plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
+        
+        ax2.set_xlabel('Date', fontsize=12)
+        
+        plt.tight_layout()
+        return fig
+    
+    @staticmethod
     def plot_drawdown(
         result: BacktestResult,
         title: str = "Portfolio Drawdown",
