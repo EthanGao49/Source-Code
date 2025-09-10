@@ -61,7 +61,7 @@ def main():
         benchmark_strategy = BuyAndHoldStrategy(allocation_method="equal_weight")
         
         # Broker
-        broker = SimpleBroker(commission=0.001, slippage=0.0005)
+        broker = SimpleBroker(commission=0.001, slippage=0)
         
         # Backtester
         backtester = Backtester(
