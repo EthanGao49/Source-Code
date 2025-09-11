@@ -1,5 +1,12 @@
+# Core dependencies
 yfinance>=0.2.18
 pandas>=1.5.0
 numpy>=1.21.0
 matplotlib>=3.5.0
 scipy>=1.9.0
+
+# AI/ML dependencies (optional)
+# Install with: pip install -r requirements.txt
+# For AI features: pip install -r requirements.txt tensorflow scikit-learn
+tensorflow>=2.10.0
+scikit-learn>=1.1.0
